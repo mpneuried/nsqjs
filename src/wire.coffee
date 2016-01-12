@@ -10,14 +10,15 @@ exports.FRAME_TYPE_MESSAGE = 2
 JSON_stringify = (obj, emit_unicode) ->
   json = JSON.stringify obj
   if emit_unicode
-    json
+    return json
   else
-    json.replace /[\u007f-\uffff]/g, (c) ->
-      '\\u' + ('0000' + c.charCodeAt(0).toString 16).slice -4
+    return json.replace /[\u007f-\uffff]/g, (c) ->
+      return '\\u' + ('0000' + c.charCodeAt(0).toString 16).slice -4
+      
 
 # Calculates the byte length for either a string or a Buffer.
 byteLength = (msg) ->
-  if _.isString msg then Buffer.byteLength msg else msg.length
+  return if _.isString msg then Buffer.byteLength msg else msg.length
 
 exports.unpackMessage = (data) ->
   # Int64 to read the 64bit Int from the buffer
@@ -28,7 +29,7 @@ exports.unpackMessage = (data) ->
   attempts = data.readInt16BE 8
   id = data[10...26].toString()
   body = data[26..]
-  [id, timestamp, attempts, body]
+  return [id, timestamp, attempts, body]
 
 command = (cmd, body) ->
   buffers = []
@@ -53,12 +54,13 @@ command = (cmd, body) ->
     else
       buffers.push body
 
-  Buffer.concat buffers
+  return Buffer.concat buffers
 
 exports.subscribe = (topic, channel) ->
   throw new Error "Invalid topic: #{topic}" unless validTopicName topic
   throw new Error "Invalid channel: #{channel}" unless validChannelName channel
-  command 'SUB', null, topic, channel
+  return command 'SUB', null, topic, channel
+  
 
 exports.identify = (data) ->
   validIdentifyKeys = [
@@ -84,16 +86,16 @@ exports.identify = (data) ->
   if unexpectedKeys.length
     throw new Error "Unexpected IDENTIFY keys: #{unexpectedKeys}"
 
-  command 'IDENTIFY', JSON_stringify data
+  return command 'IDENTIFY', JSON_stringify data
 
 exports.ready = (count) ->
   throw new Error "RDY count (#{count}) is not a number" unless _.isNumber count
   throw new Error "RDY count (#{count}) is not positive" unless count >= 0
-  command 'RDY', null, count.toString()
+  return command 'RDY', null, count.toString()
 
 exports.finish = (id) ->
   throw new Error "FINISH invalid id (#{id})" unless Buffer.byteLength(id) <= 16
-  command 'FIN', null, id
+  return command 'FIN', null, id
 
 exports.requeue = (id, timeMs=0) ->
   unless Buffer.byteLength(id) <= 16
@@ -102,16 +104,16 @@ exports.requeue = (id, timeMs=0) ->
     throw new Error "REQUEUE delay time is invalid (#{timeMs})"
 
   parameters = ['REQ', null, id, timeMs]
-  command.apply null, parameters
+  return command.apply null, parameters
 
 exports.touch = (id) ->
-  command 'TOUCH', null, id
+  return command 'TOUCH', null, id
 
 exports.nop = ->
-  command 'NOP', null
+  return command 'NOP', null
 
 exports.pub = (topic, data) ->
-  command 'PUB', data, topic
+  return command 'PUB', data, topic
 
 exports.mpub = (topic, data) ->
   throw new Error "MPUB requires an array of message" unless _.isArray data
@@ -130,15 +132,14 @@ exports.mpub = (topic, data) ->
   numMessagesBuffer.writeInt32BE messages.length, 0
   messages.unshift numMessagesBuffer
 
-  command 'MPUB', Buffer.concat(messages), topic
+  return command 'MPUB', Buffer.concat(messages), topic
 
 exports.auth = (token) ->
-  command 'AUTH', token
+  return command 'AUTH', token
 
 validTopicName = (topic) ->
-  (0 < topic.length < 65) and topic.match(/^[\w._-]+(?:#ephemeral)?$/)?
+  return (0 < topic.length < 65) and topic.match(/^[\w._-]+(?:#ephemeral)?$/)?
 
 validChannelName = (channel) ->
   channelRe = /^[\w._-]+(?:#ephemeral)?$/
-  (0 < channel.length < 65) and channel.match(channelRe)?
-
+  return (0 < channel.length < 65) and channel.match(channelRe)?

@@ -35,6 +35,8 @@ lookupdRequest = (url, callback) ->
       return
 
     callback null, producers
+    return
+  return
 
 ###
 Takes a list of responses from lookupds and dedupes the nsqd hosts based on
@@ -44,7 +46,7 @@ Arguments:
   results: list of lists of nsqd node objects.
 ###
 dedupeOnHostPort = (results) ->
-  _.chain(results)
+  hosts = _.chain(results)
     # Flatten list of lists of objects
     .flatten()
     # De-dupe nodes by hostname / port
@@ -52,6 +54,7 @@ dedupeOnHostPort = (results) ->
       "#{item.hostname}:#{item.tcp_port}"
     .values()
     .value()
+  return hosts
 
 dedupedRequests = (lookupdEndpoints, urlFn, callback) ->
   # Ensure we have a list of endpoints for lookupds.
@@ -63,8 +66,10 @@ dedupedRequests = (lookupdEndpoints, urlFn, callback) ->
   async.map urls, lookupdRequest, (err, results) ->
     if err
       callback err, null
-    else
-      callback null, dedupeOnHostPort results
+      return
+    callback null, dedupeOnHostPort results
+    return
+  return
 
 ###
 Queries lookupds for known nsqd nodes given a topic and returns a deduped list.
@@ -85,7 +90,8 @@ lookup = (lookupdEndpoints, topic, callback) ->
       parsedUrl.pathname = "/lookup"
     parsedUrl.query.topic = topic
     delete parsedUrl.search
-    url.format(parsedUrl)
+    return url.format(parsedUrl)
   dedupedRequests lookupdEndpoints, endpointURL, callback
+  return
 
 module.exports = lookup

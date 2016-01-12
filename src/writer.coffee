@@ -41,6 +41,7 @@ class Writer extends EventEmitter
 
     @debug 'Configuration'
     @debug @config
+    return
 
   connect: ->
     @conn = new WriterNSQDConnection @nsqdHost, @nsqdPort, @config
@@ -51,21 +52,26 @@ class Writer extends EventEmitter
       @debug 'ready'
       @ready = true
       @emit Writer.READY
+      return
 
     @conn.on WriterNSQDConnection.CLOSED, =>
       @debug 'closed'
       @ready = false
       @emit Writer.CLOSED
+      return
 
     @conn.on WriterNSQDConnection.ERROR, (err) =>
       @debug 'error', err
       @ready = false
       @emit Writer.ERROR, err
+      return
 
     @conn.on WriterNSQDConnection.CONNECTION_ERROR, (err) =>
       @debug 'error', err
       @ready = false
       @emit Writer.ERROR, err
+      return
+    return
 
   ###
   Publish a message or a list of messages to the connected nsqd. The contents
@@ -94,16 +100,19 @@ class Writer extends EventEmitter
       ready = =>
         remove()
         @publish topic, msgs, callback
+        return
 
       failed = (err) ->
         err or= new Error 'Connection closed!'
         remove()
         callback err
+        return
 
       remove = =>
         @removeListener Writer.READY, ready
         @removeListener Writer.ERROR, failed
         @removeListener Writer.CLOSED, failed
+        return
 
       @on Writer.READY, ready
       @on Writer.ERROR, failed
@@ -121,8 +130,10 @@ class Writer extends EventEmitter
         JSON.stringify msg
 
     @conn.produceMessages topic, msgs, callback
-
+    return
+    
   close: ->
     @conn.destroy()
+    return
 
 module.exports = Writer

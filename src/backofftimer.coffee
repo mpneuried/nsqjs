@@ -1,10 +1,10 @@
 decimal = require 'bignumber.js'
 
 min = (a, b) ->
-  if a.lte b then a else b
+  return if a.lte b then a else b
 
 max = (a, b) ->
-  if a.gte b then a else b
+  return if a.gte b then a else b
 
 ###
 This is a timer that is smart about backing off exponentially when there
@@ -33,20 +33,23 @@ class BackoffTimer
 
     @shortInterval = decimal 0
     @longInterval = decimal 0
+    return
 
   success: ->
     @shortInterval = @shortInterval.minus @shortUnit
     @longInterval = @longInterval.minus @longUnit
     @shortInterval = max @shortInterval, decimal 0
     @longInterval = max @longInterval, decimal 0
+    return
 
   failure: ->
     @shortInterval = @shortInterval.plus @shortUnit
     @longInterval = @longInterval.plus @longUnit
     @shortInterval = min @shortInterval, @maxShortTimer
     @longInterval = min @longInterval, @maxLongTimer
+    return
 
   getInterval: ->
-    @minInterval.plus @shortInterval.plus @longInterval
+    return @minInterval.plus @shortInterval.plus @longInterval
 
 module.exports = BackoffTimer

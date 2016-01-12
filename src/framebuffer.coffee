@@ -15,6 +15,7 @@ class FrameBuffer
 
   consume: (raw) ->
     @buffer = Buffer.concat _.compact [@buffer, raw]
+    return
 
   nextFrame: ->
     return unless @buffer
@@ -25,23 +26,23 @@ class FrameBuffer
     @buffer = @buffer[nextOffset..]
     delete @buffer unless @buffer.length
 
-    frame
+    return frame
 
   # Given an offset into a buffer, get the frame ID and data tuple.
   pluckFrame: (offset = 0) ->
     frame = @buffer[offset...offset + @frameSize offset]
     frameId = frame.readInt32BE 4
-    [frameId, frame[8..]]
+    return [frameId, frame[8..]]
 
   # Given the offset of the current frame in the buffer, find the offset
   # of the next buffer.
   nextOffset: (offset=0) ->
     size = @frameSize offset
-    offset + size if size
+    return offset + size if size
 
   # Given the frame offset, return the frame size.
   frameSize: (offset) ->
     return unless @buffer and @buffer.length > 4
-    4 + @buffer.readInt32BE offset if offset + 4 <= @buffer.length
+    return 4 + @buffer.readInt32BE offset if offset + 4 <= @buffer.length
 
 module.exports = FrameBuffer

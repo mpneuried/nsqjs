@@ -24,10 +24,12 @@ class ConnectionConfig
       .defaults(@constructor.DEFAULTS)
       .value()
     _.extend this, options
+    return
 
   isNonEmptyString: (option, value) ->
     unless _.isString(value) and value.length > 0
       throw new Error "#{option} must be a non-empty string"
+    return
 
   isNumber: (option, value, lower, upper=null) ->
     if _.isNaN(value) or not _.isNumber value
@@ -39,6 +41,7 @@ class ConnectionConfig
     else
       unless lower <= value
         throw new Error "#{lower} <= #{option}(#{value})"
+    return
 
   isNumberExclusive: (option, value, lower, upper=null) ->
     if _.isNaN(value) or not _.isNumber value
@@ -50,28 +53,32 @@ class ConnectionConfig
     else
       unless lower < value
         throw new Error "#{lower} < #{option}(#{value})"
+    return
 
   isBoolean: (option, value) ->
     unless _.isBoolean value
       throw new Error "#{option} must be either true or false"
+    return
 
   isBareAddress = (addr) ->
     [host, port] = addr.split ':'
-    host.length > 0 and port > 0
+    return host.length > 0 and port > 0
 
   isBareAddresses: (option, value) ->
     unless _.isArray(value) and _.every value, isBareAddress
       throw new Error "#{option} must be a list of addresses 'host:port'"
+    return
 
   isLookupdHTTPAddresses: (option, value) ->
     isAddr = (addr) ->
       return isBareAddress(addr) if addr.indexOf('://') is -1
       parsedUrl = url.parse(addr)
-      parsedUrl.protocol in ['http:', 'https:'] and !!parsedUrl.host
+      return parsedUrl.protocol in ['http:', 'https:'] and !!parsedUrl.host
 
     unless _.isArray(value) and _.every value, isAddr
       throw new Error "#{option} must be a list of addresses 'host:port' or
         HTTP/HTTPS URI"
+    return
 
   conditions: ->
     authSecret: [@isNonEmptyString]
@@ -88,10 +95,12 @@ class ConnectionConfig
     snappy: [@isBoolean]
     tls: [@isBoolean]
     tlsVerification: [@isBoolean]
+    
 
   validateOption: (option, value) ->
     [fn, args...] = @conditions()[option]
     fn option, value, args...
+    return
 
   validate: ->
     for option, value of this
@@ -112,6 +121,7 @@ class ConnectionConfig
     # Mutually exclusive options
     if @snappy and @deflate
       throw new Error 'Cannot use both deflate and snappy'
+    return
 
 
 class ReaderConfig extends ConnectionConfig
@@ -125,7 +135,7 @@ class ReaderConfig extends ConnectionConfig
     maxBackoffDuration: 128
 
   conditions: ->
-    _.extend {}, super(),
+    return _.extend {}, super(),
       lookupdHTTPAddresses: [@isLookupdHTTPAddresses]
       lookupdPollInterval: [@isNumber, 1]
       lookupdPollJitter: [@isNumberExclusive, 0, 1]
@@ -133,6 +143,7 @@ class ReaderConfig extends ConnectionConfig
       nsqdTCPAddresses: [@isBareAddresses]
       maxAttempts: [@isNumber, 0]
       maxBackoffDuration: [@isNumber, 0]
+    
 
   validate: ->
     addresses = ['nsqdTCPAddresses', 'lookupdHTTPAddresses']
@@ -152,5 +163,6 @@ class ReaderConfig extends ConnectionConfig
 
     unless pass
       throw new Error "Need to provide either #{addresses.join ' or '}"
+    return
 
 module.exports = {ConnectionConfig, ReaderConfig}

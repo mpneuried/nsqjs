@@ -29,6 +29,8 @@ class Message extends EventEmitter
       # Both values have to be not null otherwise we've timedout.
       @timedOut = not soft or not hard
       setTimeout trackTimeout, Math.min soft, hard unless @timedOut
+      return
+    return
 
   json: ->
     unless @parsed?
@@ -36,7 +38,7 @@ class Message extends EventEmitter
         @parsed = JSON.parse @body
       catch err
         throw new Error "Invalid JSON in Message"
-    @parsed
+    return @parsed
 
 
   # Returns in milliseconds the time until this message expires. Returns
@@ -52,18 +54,21 @@ class Message extends EventEmitter
     else
       @lastTouched + @msgTimeout - Date.now()
 
-    if delta > 0 then delta else null
+    return if delta > 0 then delta else null
 
   finish: ->
     @respond Message.FINISH, wire.finish @id
+    return
 
   requeue: (delay = @requeueDelay, backoff = true) ->
     @respond Message.REQUEUE, wire.requeue @id, delay
     @emit Message.BACKOFF if backoff
+    return
 
   touch: ->
     @lastTouched = Date.now()
     @respond Message.TOUCH, wire.touch @id
+    return
 
   respond: (responseType, wireData) ->
     # TODO: Add a debug/warn when we moved to debug.js
@@ -76,6 +81,7 @@ class Message extends EventEmitter
         @lastTouched = Date.now()
 
       @emit Message.RESPOND, responseType, wireData
-
+      return
+    return
 
 module.exports = Message

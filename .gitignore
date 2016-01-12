@@ -9,3 +9,8 @@ lib
 node_modules/
 share/man
 src/node-*
+
+test/test/*.js
+test/test/*.js.map
+dest/src/*.js
+dest/src/*.js.map

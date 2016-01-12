@@ -17,20 +17,21 @@ class RoundRobinList
     @index = 0
 
   length: ->
-    @lst.length
+    return @lst.length
 
   add: (item) ->
     @lst.push item
+    return
 
   remove: (item) ->
     itemIndex = @lst.indexOf item
     return if itemIndex is -1
     @index -= 1 if @index > itemIndex
     @lst.splice itemIndex, 1
-
+    return 
   next: (count = 1) ->
     index = @index
     @index = (@index + count) % @lst.length
-    @lst[index...index + count]
+    return @lst[index...index + count]
 
 module.exports = RoundRobinList

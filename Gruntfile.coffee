@@ -24,7 +24,7 @@ module.exports = (grunt) ->
     watch:
       lib:
         files: '<%= coffee.lib.src %>'
-        tasks: ['coffee:lib']
+        tasks: ['coffee:lib', 'test']
 
       test:
         files: [
@@ -38,6 +38,7 @@ module.exports = (grunt) ->
         require: ['coffee-errors']
         reporter: 'spec'
         colors: true
+        bail: false
         compilers: ['coffee:coffee-script']
       all: ['./test/*.coffee']
 

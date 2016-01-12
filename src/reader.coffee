@@ -40,6 +40,7 @@ class Reader extends EventEmitter
       "#{@topic}/#{@channel}"
     @connectIntervalId = null
     @connectionIds = []
+    return
 
   connect: ->
     interval = @config.lookupdPollInterval * 1000
@@ -55,40 +56,49 @@ class Reader extends EventEmitter
           for addr in @config.nsqdTCPAddresses
             [address, port] = addr.split ':'
             @connectToNSQD address, Number(port)
+        return
 
       delayedStart = =>
         @connectIntervalId = setInterval directConnect.bind(this), interval
+        return
 
       # Connect immediately.
       directConnect()
       # Start interval for connecting after delay.
       setTimeout delayedStart, delay
-
+      return
+      
     # Connect to nsqds discovered via lookupd
-    else
-      delayedStart = =>
-        @connectIntervalId = setInterval @queryLookupd.bind(this), interval
+    
+    delayedStart = =>
+      @connectIntervalId = setInterval @queryLookupd.bind(this), interval
+      return
 
-      # Connect immediately.
-      @queryLookupd()
-      # Start interval for querying lookupd after delay.
-      setTimeout delayedStart, delay
+    # Connect immediately.
+    @queryLookupd()
+    # Start interval for querying lookupd after delay.
+    setTimeout delayedStart, delay
+    return
 
   # Caution: in-flight messages will not get a chance to finish.
   close: ->
     clearInterval @connectIntervalId
     @readerRdy.close()
+    return
 
   pause: ->
     @debug 'pause'
     @readerRdy.pause()
+    return
 
   unpause: ->
     @debug 'unpause'
     @readerRdy.unpause()
+    return
 
   isPaused: ->
     @readerRdy.isPaused()
+    return
 
   queryLookupd: ->
     # Don't establish new connections while the Reader is paused.
@@ -98,7 +108,9 @@ class Reader extends EventEmitter
     endpoint = @roundrobinLookupd.next()
     lookup endpoint, @topic, (err, nodes) =>
       @connectToNSQD n.broadcast_address, n.tcp_port for n in nodes unless err
-
+      return
+    return
+    
   connectToNSQD: (host, port) ->
     @debug "connecting to #{host}:#{port}"
     conn = new NSQDConnection host, port, @topic, @channel, @config
@@ -111,21 +123,25 @@ class Reader extends EventEmitter
     @readerRdy.addConnection conn
 
     conn.connect()
+    return
 
   registerConnectionListeners: (conn) ->
     conn.on NSQDConnection.CONNECTED, =>
       @debug Reader.NSQD_CONNECTED
       @emit Reader.NSQD_CONNECTED, conn.nsqdHost, conn.nsqdPort
+      return
 
     conn.on NSQDConnection.ERROR, (err) =>
       @debug Reader.ERROR
       @debug err
       @emit Reader.ERROR, err
+      return
 
     conn.on NSQDConnection.CONNECTION_ERROR, (err) =>
       @debug Reader.ERROR
       @debug err
       @emit Reader.ERROR, err
+      return
 
     # On close, remove the connection id from this reader.
     conn.on NSQDConnection.CLOSED, =>
@@ -136,12 +152,15 @@ class Reader extends EventEmitter
       @connectionIds.splice index, 1
 
       @emit Reader.NSQD_CLOSED, conn.nsqdHost, conn.nsqdPort
+      return
 
     # On message, send either a message or discard event depending on the
     # number of attempts.
     conn.on NSQDConnection.MESSAGE, (message) =>
       @handleMessage message
-
+      return
+    return
+    
   handleMessage: (message) ->
     # Give the internal event listeners a chance at the events before clients
     # of the Reader.
@@ -155,5 +174,7 @@ class Reader extends EventEmitter
         @emit Reader.MESSAGE, message
 
       message.finish() if autoFinishMessage
+      return
+    return
 
 module.exports = Reader

@@ -88,12 +88,13 @@ class NSQDConnection extends EventEmitter
     @conn = null                   # Socket connection to NSQD
     @identifyTimeoutId = null      # Timeout ID for triggering identifyFail
     @messageCallbacks = []         # Callbacks on message sent responses
+    return
 
   id: ->
-    "#{@nsqdHost}:#{@nsqdPort}"
+    return "#{@nsqdHost}:#{@nsqdPort}"
 
   connectionState: ->
-    @statemachine or new ConnectionState this
+    return @statemachine or new ConnectionState this
 
   connect: ->
     # Using nextTick so that clients of Reader can register event listeners
@@ -105,17 +106,23 @@ class NSQDConnection extends EventEmitter
         # Once there's a socket connection, give it 5 seconds to receive an
         # identify response.
         @identifyTimeoutId = setTimeout @identifyTimeout.bind(this), 5000
-
+        return
       @registerStreamListeners @conn
+      return
+    return
 
   registerStreamListeners: (conn) ->
     conn.on 'data', (data) =>
       @receiveRawData data
+      return
     conn.on 'error', (err) =>
       @statemachine.goto 'CLOSED'
       @emit 'connection_error', err
+      return
     conn.on 'close', (err) =>
       @statemachine.raise 'close'
+      return
+    return
 
   startTLS: (callback) ->
     @conn.removeAllListeners event for event in ['data', 'error', 'close']
@@ -126,35 +133,44 @@ class NSQDConnection extends EventEmitter
     tlsConn = tls.connect options, =>
       @conn = tlsConn
       callback?()
-
+      return
+      
     @registerStreamListeners tlsConn
+    return
 
   startDeflate: (level) ->
     @inflater = zlib.createInflateRaw flush: zlib.Z_SYNC_FLUSH
     @deflater = zlib.createDeflateRaw level: level, flush: zlib.Z_SYNC_FLUSH
     @reconsumeFrameBuffer()
+    return
 
   startSnappy: ->
     @inflater = new UnsnappyStream()
     @deflater = new SnappyStream()
     @reconsumeFrameBuffer()
+    return
 
   reconsumeFrameBuffer: ->
     if @frameBuffer.buffer and @frameBuffer.buffer.length
       data = @frameBuffer.buffer
       delete @frameBuffer.buffer
       @receiveRawData data
+    return
 
   setRdy: (rdyCount) ->
     @statemachine.raise 'ready', rdyCount
+    return
 
   receiveRawData: (data) ->
     unless @inflater
       @receiveData data
-    else
-      @inflater.write data, =>
-        uncompressedData = @inflater.read()
-        @receiveData uncompressedData if uncompressedData
+      return
+    
+    @inflater.write data, =>
+      uncompressedData = @inflater.read()
+      @receiveData uncompressedData if uncompressedData
+      return
+    return
 
   receiveData: (data) ->
     @lastReceivedTimestamp = Date.now()
@@ -170,6 +186,7 @@ class NSQDConnection extends EventEmitter
         when wire.FRAME_TYPE_MESSAGE
           @lastMessageTimestamp = @lastReceivedTimestamp
           @statemachine.raise 'consumeMessage', @createMessage payload
+    return
 
   identify: ->
     longName = os.hostname()
@@ -199,14 +216,15 @@ class NSQDConnection extends EventEmitter
       'sample_rate'
     ]
     delete identify[key] for key in removableKeys when identify[key] is null
-    identify
+    return identify
 
   identifyTimeout: ->
-    @statemachine.goto 'ERROR', new Error 'Timed out identifying with nsqd'
+    return @statemachine.goto 'ERROR', new Error 'Timed out identifying with nsqd'
 
   clearIdentifyTimeout: ->
     clearTimeout @identifyTimeoutId
     @identifyTimeoutId = null
+    return
 
   # Create a Message object from the message payload received from nsqd.
   createMessage: (msgPayload) ->
@@ -225,21 +243,27 @@ class NSQDConnection extends EventEmitter
       else if responseType is Message.REQUEUE
         @debug "Requeued message [#{msg.id}]"
         @emit NSQDConnection.REQUEUED
+      return
 
     msg.on Message.BACKOFF, =>
       @emit NSQDConnection.BACKOFF
+      return
 
-    msg
+    return msg
 
   write: (data) ->
     if @deflater
       @deflater.write data, =>
         @conn.write @deflater.read()
-    else
-      @conn.write data
+        return
+      return
+    
+    @conn.write data
+    return
 
   destroy: ->
     @conn.destroy()
+    return
 
 
 class ConnectionState extends NodeState
@@ -250,28 +274,33 @@ class ConnectionState extends NodeState
       sync_goto: true
 
     @identifyResponse = null
-
+    return
+    
   log: (message) ->
     @conn.debug "#{@current_state_name}"
     @conn.debug message if message
+    return
 
   afterIdentify: ->
-    'SUBSCRIBE'
+    return 'SUBSCRIBE'
 
   states:
     CONNECTING:
       connected: ->
         @goto 'CONNECTED'
+        return
 
     CONNECTED:
       Enter: ->
         @goto 'SEND_MAGIC_IDENTIFIER'
+        return
 
     SEND_MAGIC_IDENTIFIER:
       Enter: ->
         # Send the magic protocol identifier to the connection
         @conn.write wire.MAGIC_V2
         @goto 'IDENTIFY'
+        return
 
     IDENTIFY:
       Enter: ->
@@ -280,6 +309,7 @@ class ConnectionState extends NodeState
         @conn.debug identify
         @conn.write wire.identify identify
         @goto 'IDENTIFY_RESPONSE'
+        return
 
     IDENTIFY_RESPONSE:
       response: (data) ->
@@ -298,6 +328,7 @@ class ConnectionState extends NodeState
 
         return @goto 'TLS_START' if @identifyResponse.tls_v1
         @goto 'IDENTIFY_COMPRESSION_CHECK'
+        return
 
     IDENTIFY_COMPRESSION_CHECK:
       Enter: ->
@@ -306,85 +337,100 @@ class ConnectionState extends NodeState
         return @goto 'DEFLATE_START', @identifyResponse.deflate_level if deflate
         return @goto 'SNAPPY_START' if snappy
         @goto 'AUTH'
+        return
 
     TLS_START:
       Enter: ->
         @conn.startTLS()
         @goto 'TLS_RESPONSE'
+        return
 
     TLS_RESPONSE:
       response: (data) ->
         if data.toString() is 'OK'
           @goto 'IDENTIFY_COMPRESSION_CHECK'
-        else
-          @goto 'ERROR', new Error 'TLS negotiate error with nsqd'
+          return
+        @goto 'ERROR', new Error 'TLS negotiate error with nsqd'
+        return
 
     DEFLATE_START:
       Enter: (level) ->
         @conn.startDeflate level
         @goto 'COMPRESSION_RESPONSE'
+        return
 
     SNAPPY_START:
       Enter: ->
         @conn.startSnappy()
         @goto 'COMPRESSION_RESPONSE'
+        return
 
     COMPRESSION_RESPONSE:
       response: (data) ->
         if data.toString() is 'OK'
           @goto 'AUTH'
-        else
-          @goto 'ERROR', new Error 'Bad response when enabling compression'
+          return
+        @goto 'ERROR', new Error 'Bad response when enabling compression'
+        return
 
     AUTH:
       Enter: ->
         return @goto @afterIdentify() unless @conn.config.authSecret
         @conn.write wire.auth @conn.config.authSecret
-        return @goto 'AUTH_RESPONSE'
+        @goto 'AUTH_RESPONSE'
+        return
 
     AUTH_RESPONSE:
       response: (data) ->
         @conn.auth = JSON.parse data
         @goto @afterIdentify()
+        return
 
     SUBSCRIBE:
       Enter: ->
         @conn.write wire.subscribe(@conn.topic, @conn.channel)
         @goto 'SUBSCRIBE_RESPONSE'
+        return
 
     SUBSCRIBE_RESPONSE:
       response: (data) ->
         if data.toString() is 'OK'
           @goto 'READY_RECV'
+        return
 
     READY_RECV:
       Enter: ->
         # Notify listener that this nsqd connection has passed the subscribe
         # phase.
         @conn.emit NSQDConnection.READY
+        return
 
       consumeMessage: (msg) ->
         @conn.emit NSQDConnection.MESSAGE, msg
+        return
 
       response: (data) ->
         @conn.write wire.nop() if data.toString() is '_heartbeat_'
+        return
 
       ready: (rdyCount) ->
         # RDY count for this nsqd cannot exceed the nsqd configured
         # max rdy count.
         rdyCount = @conn.maxRdyCount if rdyCount > @conn.maxRdyCount
         @conn.write wire.ready rdyCount
+        return
 
       close: ->
         @goto 'CLOSED'
+        return
 
     READY_SEND:
       Enter: ->
         # Notify listener that this nsqd connection is ready to send.
         @conn.emit NSQDConnection.READY
+        return
 
-      produceMessages: (data) ->
-        [topic, msgs, callback] = data
+      produceMessages: ([topic, msgs, callback]) ->
         @conn.messageCallbacks.push callback
 
         unless _.isArray msgs
@@ -394,6 +440,7 @@ class ConnectionState extends NodeState
           @conn.write wire.pub topic, msgs[0]
         else
           @conn.write wire.mpub topic, msgs
+        return
 
       response: (data) ->
         switch data.toString()
@@ -402,9 +449,11 @@ class ConnectionState extends NodeState
             cb? null
           when '_heartbeat_'
             @conn.write wire.nop()
+        return
 
       close: ->
         @goto 'CLOSED'
+        return
 
     ERROR:
       Enter: (err) ->
@@ -421,11 +470,13 @@ class ConnectionState extends NodeState
         errorCode = err.split(/\s+/)?[1]
         if errorCode in ['E_REQ_FAILED', 'E_FIN_FAILED', 'E_TOUCH_FAILED']
           @goto 'READY_RECV'
-        else
-          @goto 'CLOSED'
+          return
+        @goto 'CLOSED'
+        return
 
       close: ->
         @goto 'CLOSED'
+        return
 
     CLOSED:
       Enter: ->
@@ -441,23 +492,28 @@ class ConnectionState extends NodeState
         @conn.destroy()
         @conn.emit NSQDConnection.CLOSED
         delete @conn
+        return
 
       close: ->
         # No-op. Once closed, subsequent calls should do nothing.
+        return
 
   transitions:
     '*':
       '*': (data, callback) ->
         @log()
         callback data
+        return
 
       CONNECTED: (data, callback) ->
         @log()
         callback data
+        return
 
       ERROR: (err, callback) ->
         @log "#{err}"
         callback err
+        return
 
 ###
 c = new NSQDConnectionWriter '127.0.0.1', 4150, 30
@@ -479,18 +535,19 @@ class WriterNSQDConnection extends NSQDConnection
   constructor: (nsqdHost, nsqdPort, options={}) ->
     super nsqdHost, nsqdPort, null, null, options
     @debug = Debug "nsqjs:writer:conn:#{nsqdHost}/#{nsqdPort}"
+    return
 
   connectionState: ->
-    @statemachine or new WriterConnectionState this
+    return @statemachine or new WriterConnectionState this
 
   produceMessages: (topic, msgs, callback) ->
-    @statemachine.raise 'produceMessages', [topic, msgs, callback]
+    return @statemachine.raise 'produceMessages', [topic, msgs, callback]
 
 
 class WriterConnectionState extends ConnectionState
 
   afterIdentify: ->
-    'READY_SEND'
+    return 'READY_SEND'
 
 
 module.exports =
